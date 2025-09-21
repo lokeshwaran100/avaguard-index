@@ -49,7 +49,7 @@ const config: HardhatUserConfig = {
     // If the network you are looking for is not here you can add new network settings
     hardhat: {
       forking: {
-        url: `https://avax-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+        url: "https://api.avax-test.network/ext/bc/C/rpc",
         enabled: true,
       },
     },

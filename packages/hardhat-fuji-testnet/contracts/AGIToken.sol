@@ -13,14 +13,14 @@ contract AGIToken is ERC20, Ownable {
     uint256 public constant TOTAL_SUPPLY = 1_000_000_000 * 10**18; // 1 billion tokens with 18 decimals
 
     constructor(address initialOwner) ERC20("Avanguard Index", "AGI") Ownable(initialOwner) {
-        _mint(initialOwner, 1_000_000 * 10**18); // Mint 1M for initial owner for testing
+        _mint(initialOwner, TOTAL_SUPPLY);
     }
 
     /**
-     * @dev Mints new tokens, only callable by the owner
+     * @dev Override to prevent minting after deployment
      */
-    function mint(address to, uint256 amount) public onlyOwner {
-        _mint(to, amount);
+    function mint(address to, uint256 amount) public pure {
+        revert("Minting disabled after deployment");
     }
 
     /**

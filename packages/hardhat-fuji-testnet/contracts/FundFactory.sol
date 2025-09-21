@@ -62,24 +62,32 @@ contract FundFactory is Ownable {
      * @param fundName Name of the fund
      * @param fundTicker Ticker symbol for the fund
      * @param tokens Array of underlying token addresses
+     * @param weightages Array of token weightages (in basis points, 100% = 10000)
      */
     function createFund(
         string memory fundName,
         string memory fundTicker,
-        address[] memory tokens
+        address[] memory tokens,
+        uint256[] memory weightages
     ) external {
         require(bytes(fundName).length > 0, "Fund name cannot be empty");
         require(bytes(fundTicker).length > 0, "Fund ticker cannot be empty");
         require(tokens.length > 0, "Must have at least one token");
         require(tokens.length <= 20, "Maximum 20 tokens per fund");
+        require(tokens.length == weightages.length, "Tokens and weightages length mismatch");
         
-        // Check for duplicate tokens
+        // Check for duplicate tokens and validate weightages
+        uint256 totalWeightage = 0;
         for (uint256 i = 0; i < tokens.length; i++) {
             require(tokens[i] != address(0), "Invalid token address");
+            require(weightages[i] > 0, "Weightage must be greater than 0");
+            totalWeightage += weightages[i];
+            
             for (uint256 j = i + 1; j < tokens.length; j++) {
                 require(tokens[i] != tokens[j], "Duplicate tokens not allowed");
             }
         }
+        require(totalWeightage == 10000, "Total weightage must be 100%");
         
         // Burn AGI tokens as creation fee
         require(
@@ -93,6 +101,7 @@ contract FundFactory is Ownable {
             fundName,
             fundTicker,
             tokens,
+            weightages,
             msg.sender,
             oracle,
             treasury,
@@ -123,12 +132,14 @@ contract FundFactory is Ownable {
      * @return fundName The fund name
      * @return fundTicker The fund ticker
      * @return underlyingTokens Array of underlying token addresses
+     * @return weightages Array of token weightages
      */
     function getFund(uint256 fundId) external view returns (
         address fundAddress,
         string memory fundName,
         string memory fundTicker,
-        address[] memory underlyingTokens
+        address[] memory underlyingTokens,
+        uint256[] memory weightages
     ) {
         require(fundId < funds.length, "Fund does not exist");
         Fund fund = funds[fundId];
@@ -136,6 +147,7 @@ contract FundFactory is Ownable {
         fundName = fund.fundName();
         fundTicker = fund.fundTicker();
         underlyingTokens = fund.getUnderlyingTokens();
+        ( , weightages) = fund.getAllTokenWeightages();
     }
     
     /**

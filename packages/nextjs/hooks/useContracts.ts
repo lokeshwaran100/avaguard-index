@@ -24,20 +24,20 @@ export const useFundFactory = () => {
   const { writeContractAsync, isPending: isCreatingFund } = useWriteContract();
 
   // Function to create a new fund
-  const createNewFund = async (fundName: string, fundTicker: string, tokens: string[], weightagesPercent: number[]) => {
+  const createNewFund = async (fundName: string, fundTicker: string, tokens: string[]) => {
     if (!address) throw new Error("Wallet not connected");
 
     try {
-      // Convert percentages [0-100] to basis points [0-10000]
-      const weightagesBps = weightagesPercent.map(w => Math.round(w * 100));
       if (!fundFactory?.address) throw new Error("FundFactory address not found");
+
+      // The FundFactory createFund function only takes fundName, fundTicker, and tokens
+      // Weightages are set to equal proportions by default in the contract
       const fundFactoryAbi = [
         {
           inputs: [
             { internalType: "string", name: "fundName", type: "string" },
             { internalType: "string", name: "fundTicker", type: "string" },
             { internalType: "address[]", name: "tokens", type: "address[]" },
-            { internalType: "uint256[]", name: "weightages", type: "uint256[]" },
           ],
           name: "createFund",
           outputs: [],
@@ -46,19 +46,13 @@ export const useFundFactory = () => {
         },
       ] as const;
 
-      console.log(
-        "fund inputs",
-        fundName,
-        fundTicker,
-        tokens as `0x${string}`[],
-        weightagesBps.map(w => BigInt(w)),
-      );
+      console.log("fund inputs", fundName, fundTicker, tokens as `0x${string}`[]);
 
       const result = await writeContractAsync({
         address: fundFactory.address as `0x${string}`,
         abi: fundFactoryAbi,
         functionName: "createFund",
-        args: [fundName, fundTicker, tokens as `0x${string}`[], weightagesBps.map(w => BigInt(w))],
+        args: [fundName, fundTicker, tokens as `0x${string}`[]],
       });
 
       if (!result) {
@@ -204,10 +198,10 @@ export const useFundContract = (fundAddress?: string) => {
     },
     {
       inputs: [
-        { internalType: "address[]", name: "tokens", type: "address[]" },
-        { internalType: "uint256[]", name: "weightages", type: "uint256[]" },
+        { internalType: "address[]", name: "_tokens", type: "address[]" },
+        { internalType: "uint256[]", name: "_proportions", type: "uint256[]" },
       ],
-      name: "rebalance",
+      name: "setProportions",
       outputs: [],
       stateMutability: "nonpayable",
       type: "function",
@@ -300,12 +294,12 @@ export const useFundContract = (fundAddress?: string) => {
   const rebalanceFund = async (tokens: string[], weightagesPercent: number[]) => {
     if (!address || !fundAddress) throw new Error("Wallet not connected or fund address missing");
     try {
-      const weightagesBps = weightagesPercent.map(w => Math.round(w * 100));
+      // setProportions expects percentages (0-100), not basis points
       const result = await writeContractAsync({
         address: fundAddress as `0x${string}`,
         abi: fundABI,
-        functionName: "rebalance",
-        args: [tokens as `0x${string}`[], weightagesBps.map(w => BigInt(w))],
+        functionName: "setProportions",
+        args: [tokens as `0x${string}`[], weightagesPercent.map(w => BigInt(Math.round(w)))],
       });
       setTimeout(() => {
         refetchBalance();
@@ -346,5 +340,14 @@ export const getAvalancheFujiTokenAddresses = () => {
     JOE: "0xEa81F6972aDf76765Fd1435E119Acc0Aafc80BeA",
     UNI: "0xf4E0A9224e8827dE91050b528F34e2F99C82Fbf6",
     SUSHI: "0x72C14f7fB8B14040dA6E5b1B9D1B9438ebD85F58",
+  };
+};
+
+// Helper function to get real Avalanche Mainnet token addresses
+export const getAvalancheMainnetTokenAddresses = () => {
+  return {
+    WAVAX: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7",
+    WBTC: "0x152b9d0FdC40C096757F570A51E494bd4b943E50",
+    WETH: "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB",
   };
 };

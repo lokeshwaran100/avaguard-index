@@ -5,7 +5,7 @@ import type { NextPage } from "next";
 import { useAccount } from "wagmi";
 import { CheckCircleIcon, DocumentDuplicateIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { useCopyToClipboard } from "~~/hooks/scaffold-eth/useCopyToClipboard";
-import { getAvalancheFujiTokenAddresses, useAGIToken, useFundFactory } from "~~/hooks/useContracts";
+import { useAGIToken, useFundFactory } from "~~/hooks/useContracts";
 import { createFund, createFundRecord } from "~~/hooks/useSupabase";
 
 const CreateFund: NextPage = () => {
@@ -30,8 +30,7 @@ const CreateFund: NextPage = () => {
   // Copy functionality
   const { copyToClipboard, isCopiedToClipboard } = useCopyToClipboard();
 
-  // Get real Avalanche Fuji token addresses
-  const fujiTokens = getAvalancheFujiTokenAddresses();
+  // Mainnet token addresses are now directly used in the select options
   const [tokens, setTokens] = useState([
     { address: "", symbol: "", weight: 20 },
     { address: "", symbol: "", weight: 20 },
@@ -100,18 +99,14 @@ const CreateFund: NextPage = () => {
         console.log("AGI approved successfully");
       }
 
-      // Convert token symbols to addresses
+      // Token symbols are now actually token addresses since we use mainnet addresses directly
       const tokenAddresses = selectedTokens.map(token => {
-        const address = fujiTokens[token.symbol as keyof typeof fujiTokens];
-        if (!address) {
-          throw new Error(`Unknown token: ${token.symbol}`);
-        }
-        return address;
+        // token.symbol now contains the actual contract address
+        return token.symbol;
       });
 
       // Create fund via smart contract
-      const weightagesPercent = selectedTokens.map(t => t.weight);
-      const contractResult = await createNewFund(fundName, ticker, tokenAddresses, weightagesPercent);
+      const contractResult = await createNewFund(fundName, ticker, tokenAddresses);
       console.log("contract result", contractResult);
 
       if (contractResult.success) {
@@ -302,13 +297,8 @@ const CreateFund: NextPage = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select token</option>
-                      <option value="ELK">ELK</option>
-                      <option value="COW">COW</option>
-                      <option value="TUR">TUR (Turtle)</option>
-                      <option value="PNG">PNG</option>
-                      <option value="JOE">JOE (Joe Coin)</option>
-                      <option value="UNI">UNI (Uniswap)</option>
-                      <option value="SUSHI">SUSHI</option>
+                      <option value="0x152b9d0FdC40C096757F570A51E494bd4b943E50">WBTC (Wrapped Bitcoin)</option>
+                      <option value="0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB">WETH (Wrapped Ethereum)</option>
                     </select>
                   </div>
 

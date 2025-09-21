@@ -1,6 +1,6 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { Contract } from "ethers";
+import { Contract, ethers } from "ethers";
 
 /**
  * Deploys the Avanguard Index contracts
@@ -35,11 +35,34 @@ const deployAvanguardIndex: DeployFunction = async function (hre: HardhatRuntime
 
   console.log("🚀 Deploying Avanguard Index contracts...");
 
-  // Use real Pangolin Router and WAVAX on Avalanche Fuji when targeting fuji
-  // https://docs.pangolin.exchange/
-  const isFuji = hre.network.name === "fuji";
+  // Network-specific addresses for Avalanche Fuji and Mainnet
+  // For hardhat fork of mainnet, we should use mainnet addresses
+  const isAvalanche =
+    hre.network.name === "avalanche" ||
+    hre.network.name === "avalancheMainnet" ||
+    (hre.network.name === "hardhat" && hre.network.config.forking?.enabled) ||
+    hre.network.name === "localhost";
+
+  // DEX Router addresses
   const PANGOLIN_ROUTER = "0x2D99ABD9008Dc933ff5c0CD271B88309593aB921"; // Fuji Pangolin Router
-  const WAVAX_ADDRESS = "0xd00ae08403B9bbb9124bB305C09058E32C39A48c"; // Fuji WAVAX
+  const TRADER_JOE_ROUTER = "0x60aE616a2155Ee3d9A68541Ba4544862310933d4"; // Avalanche Mainnet Trader Joe Router
+
+  // WAVAX addresses
+  const WAVAX_FUJI = "0xd00ae08403B9bbb9124bB305C09058E32C39A48c"; // Fuji WAVAX
+  const WAVAX_MAINNET = "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7"; // Mainnet WAVAX
+
+  // Token addresses for mainnet
+  const WBTC_MAINNET = "0x152b9d0FdC40C096757F570A51E494bd4b943E50";
+  const WETH_MAINNET = "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB";
+
+  // Chainlink Price Feed addresses on Avalanche
+  const AVAX_USD_FEED = "0x0A77230d17318075983913bC2145DB16C7366156"; // Mainnet
+  const BTC_USD_FEED = "0x2779D32d5166BAaa2B2b658333bA7e6Ec0C65743"; // Mainnet
+  const ETH_USD_FEED = "0x976B3D034E162d8bD72D6b9C989d545b839003b0"; // Mainnet
+
+  // Use appropriate addresses based on network
+  const DEX_ROUTER = isAvalanche ? TRADER_JOE_ROUTER : PANGOLIN_ROUTER;
+  const WAVAX_ADDRESS = isAvalanche ? WAVAX_MAINNET : WAVAX_FUJI;
 
   // Deploy AGI Token
   console.log("📝 Deploying AGI Token...");
@@ -50,9 +73,9 @@ const deployAvanguardIndex: DeployFunction = async function (hre: HardhatRuntime
     autoMine: true,
   });
 
-  // Deploy Mock Oracle (used as price feed source)
-  console.log("🔮 Deploying Mock Oracle...");
-  const mockOracle = await deploy("MockOracle", {
+  // Deploy Chainlink Oracle (used as price feed source)
+  console.log("🔮 Deploying Chainlink Oracle...");
+  const chainlinkOracle = await deploy("ChainlinkOracle", {
     from: deployer,
     args: [],
     log: true,
@@ -64,59 +87,34 @@ const deployAvanguardIndex: DeployFunction = async function (hre: HardhatRuntime
   const fundFactory = await deploy("FundFactory", {
     from: deployer,
     // FundFactory(agi, oracle, treasury, dex, wavax, initialOwner)
-    args: [
-      agiToken.address,
-      mockOracle.address,
-      deployer,
-      isFuji ? PANGOLIN_ROUTER : PANGOLIN_ROUTER,
-      isFuji ? WAVAX_ADDRESS : WAVAX_ADDRESS,
-      deployer,
-    ],
+    args: [agiToken.address, chainlinkOracle.address, deployer, DEX_ROUTER, WAVAX_ADDRESS, deployer],
     log: true,
     autoMine: true,
   });
 
-  // Deploy some mock tokens for testing
-  console.log("🪙 Deploying Mock Tokens...");
-  const mockUSDC = await deploy("MockERC20", {
-    from: deployer,
-    args: ["USD Coin", "USDC", deployer],
-    log: true,
-    autoMine: true,
-  });
+  // Configure Chainlink price feeds
+  console.log("💰 Configuring Chainlink price feeds...");
+  const oracleContract = await hre.ethers.getContract<Contract>("ChainlinkOracle", deployer);
 
-  const mockUSDT = await deploy("MockERC20", {
-    from: deployer,
-    args: ["Tether USD", "USDT", deployer],
-    log: true,
-    autoMine: true,
-  });
-
-  const mockWBTC = await deploy("MockERC20", {
-    from: deployer,
-    args: ["Wrapped Bitcoin", "WBTC", deployer],
-    log: true,
-    autoMine: true,
-  });
-
-  // Set some mock prices in the oracle
-  console.log("💰 Setting mock token prices...");
-  const oracleContract = await hre.ethers.getContract<Contract>("MockOracle", deployer);
-
-  // Set prices in USD with 8 decimals
-  await oracleContract.setTokenPrice(mockUSDC.address, 100000000); // $1.00
-  await oracleContract.setTokenPrice(mockUSDT.address, 100000000); // $1.00
-  await oracleContract.setTokenPrice(mockWBTC.address, 30000000000); // $30,000.00
+  if (isAvalanche) {
+    // Configure price feeds for Avalanche mainnet
+    await oracleContract.setPriceFeed(ethers.ZeroAddress, AVAX_USD_FEED); // AVAX/USD
+    await oracleContract.setPriceFeed(WBTC_MAINNET, BTC_USD_FEED); // WBTC/USD
+    await oracleContract.setPriceFeed(WETH_MAINNET, ETH_USD_FEED); // WETH/USD
+    console.log("  - Configured price feeds for AVAX, WBTC, and WETH on Avalanche mainnet");
+  } else {
+    // For Fuji testnet, we could deploy mock price feeds or use existing ones
+    console.log("  - ChainlinkOracle deployed on Fuji testnet (price feeds need manual configuration)");
+  }
 
   console.log("✅ Avanguard Index contracts deployed successfully!");
   console.log("📊 AGI Token:", agiToken.address);
-  console.log("🔮 Mock Oracle:", mockOracle.address);
-  console.log("🔄 DEX Router:", PANGOLIN_ROUTER);
+  console.log("🔮 Chainlink Oracle:", chainlinkOracle.address);
+  console.log("🔄 DEX Router:", DEX_ROUTER);
   console.log("🌊 WAVAX:", WAVAX_ADDRESS);
   console.log("🏭 Fund Factory:", fundFactory.address);
-  console.log("🪙 Mock USDC:", mockUSDC.address);
-  console.log("🪙 Mock USDT:", mockUSDT.address);
-  console.log("🪙 Mock WBTC:", mockWBTC.address);
+  console.log("🌐 Network:", hre.network.name);
+  console.log("📋 Deployer:", deployer);
 };
 
 export default deployAvanguardIndex;

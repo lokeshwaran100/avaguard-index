@@ -10,9 +10,9 @@ export const useFunds = () => {
   useEffect(() => {
     const fetchFunds = async () => {
       try {
-        const { data: fundsData, error: fundsError } = await supabase.from("funds").select(`
+        const { data: fundsData, error: fundsError } = await supabase.from("funds_main").select(`
             *,
-            fund_tokens (*)
+            fund_tokens:fund_tokens_main (*)
           `);
 
         if (fundsError) throw fundsError;
@@ -46,12 +46,12 @@ export const useUserInvestments = (userAddress?: string) => {
     const fetchInvestments = async () => {
       try {
         const { data, error } = await supabase
-          .from("investments")
+          .from("investments_main")
           .select(
             `
-            *,
-            fund:funds (*)
-          `,
+        *,
+        fund:funds_main (*)
+      `,
           )
           .eq("user_address", userAddress);
 
@@ -86,11 +86,11 @@ export const useUserFunds = (userAddress?: string) => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from("funds")
+        .from("funds_main")
         .select(
           `
             *,
-            fund_tokens (*)
+            fund_tokens:fund_tokens_main (*)
           `,
         )
         .eq("creator_address", userAddress);
@@ -128,11 +128,11 @@ export const useFund = (fundAddress?: string) => {
     const fetchFund = async () => {
       try {
         const { data, error } = await supabase
-          .from("funds")
+          .from("funds_main")
           .select(
             `
             *,
-            fund_tokens (*)
+            fund_tokens:fund_tokens_main (*)
           `,
           )
           .eq("fund_address", fundAddress)
@@ -169,11 +169,11 @@ export const useTransactions = (userAddress?: string) => {
     const fetchTransactions = async () => {
       try {
         const { data, error } = await supabase
-          .from("transactions")
+          .from("transactions_main")
           .select(
             `
             *,
-            fund:funds (*)
+            fund:funds_main (*)
           `,
           )
           .eq("user_address", userAddress)
@@ -207,14 +207,14 @@ export const createFundRecord = async (
   try {
     // First, ensure user exists
     const { error: userError } = await supabase
-      .from("users")
+      .from("users_main")
       .upsert({ wallet_address: creatorAddress }, { onConflict: "wallet_address" });
 
     if (userError) throw userError;
 
     // Create the fund record with actual contract address
     const { data: fundData, error: fundError } = await supabase
-      .from("funds")
+      .from("funds_main")
       .insert({
         fund_address: fundAddress,
         fund_id: fundId,
@@ -222,7 +222,7 @@ export const createFundRecord = async (
         name,
         ticker,
         description,
-        agi_burned: 1000, // Fixed creation fee
+        agi_burned: 1000, // AGI creation fee (1000 AGI tokens)
         underlying_tokens: tokens.map(t => t.symbol),
       })
       .select()
@@ -230,14 +230,15 @@ export const createFundRecord = async (
 
     if (fundError) throw fundError;
 
-    // Create fund tokens
-    const fundTokens = tokens.map(token => ({
+    // Create fund tokens with equal weights (matching smart contract behavior)
+    const equalWeight = Math.floor(100 / tokens.length);
+    const fundTokens = tokens.map((token, index) => ({
       fund_address: fundData.fund_address,
-      token_address: token.symbol, // Using symbol as address for now
-      weight_percentage: token.weight,
+      token_address: token.symbol, // Now using actual token addresses from mainnet
+      weight_percentage: index === tokens.length - 1 ? 100 - equalWeight * (tokens.length - 1) : equalWeight, // Last token gets remainder
     }));
 
-    const { error: tokensError } = await supabase.from("fund_tokens").insert(fundTokens);
+    const { error: tokensError } = await supabase.from("fund_tokens_main").insert(fundTokens);
 
     if (tokensError) throw tokensError;
 
@@ -268,14 +269,14 @@ export const investInFund = async (userAddress: string, fundAddress: string, amo
   try {
     // Ensure user exists
     const { error: userError } = await supabase
-      .from("users")
+      .from("users_main")
       .upsert({ wallet_address: userAddress }, { onConflict: "wallet_address" });
 
     if (userError) throw userError;
 
     // Create or update investment
     const { data: existingInvestment } = await supabase
-      .from("investments")
+      .from("investments_main")
       .select("*")
       .eq("user_address", userAddress)
       .eq("fund_address", fundAddress)
@@ -284,7 +285,7 @@ export const investInFund = async (userAddress: string, fundAddress: string, amo
     if (existingInvestment) {
       // Update existing investment
       const { error } = await supabase
-        .from("investments")
+        .from("investments_main")
         .update({
           share_balance: (existingInvestment.share_balance || 0) + amount,
           last_updated: new Date().toISOString(),
@@ -294,7 +295,7 @@ export const investInFund = async (userAddress: string, fundAddress: string, amo
       if (error) throw error;
     } else {
       // Create new investment
-      const { error } = await supabase.from("investments").insert({
+      const { error } = await supabase.from("investments_main").insert({
         user_address: userAddress,
         fund_address: fundAddress,
         share_balance: amount,
@@ -304,7 +305,7 @@ export const investInFund = async (userAddress: string, fundAddress: string, amo
     }
 
     // Record transaction
-    const { error: txError } = await supabase.from("transactions").insert({
+    const { error: txError } = await supabase.from("transactions_main").insert({
       user_address: userAddress,
       fund_address: fundAddress,
       txn_type: "buy",
@@ -327,7 +328,7 @@ export const updateFundWeights = async (fundAddress: string, newWeights: { [toke
     // Update each token's weight in the fund_tokens table
     const updates = Object.entries(newWeights).map(([tokenAddress, weight]) =>
       supabase
-        .from("fund_tokens")
+        .from("fund_tokens_main")
         .update({ weight_percentage: weight })
         .eq("fund_address", fundAddress)
         .eq("token_address", tokenAddress),
