@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     }
 
     const account = privateKeyToAccount(pk as `0x${string}`);
-    const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc";
+    const rpcUrl = "https://api.avax-test.network/ext/bc/C/rpc";
     const walletClient = createWalletClient({ account, chain: avalancheFuji, transport: http(rpcUrl) });
 
     const agi = deployedContracts[43113 as keyof typeof deployedContracts].AGIToken;

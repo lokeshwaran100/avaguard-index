@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useAccount } from "wagmi";
 import { ArrowLeftIcon, CheckCircleIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
@@ -9,7 +9,8 @@ import { useFundContract } from "~~/hooks/useContracts";
 import { investInFund, useFund } from "~~/hooks/useSupabase";
 
 const FundDetail = (props: any) => {
-  const { params } = props as { params: { id: string } };
+  const { params } = props as { params: Promise<{ id: string }> };
+  const resolvedParams = use(params);
   const { isConnected, address } = useAccount();
   const [activeTab, setActiveTab] = useState("overview");
   const [amount, setAmount] = useState("");
@@ -17,12 +18,12 @@ const FundDetail = (props: any) => {
   const [isInvesting, setIsInvesting] = useState(false);
 
   // Get real fund data from Supabase using fund address
-  const { fund, loading } = useFund(params.id); // params.id is now the fund address
+  const { fund, loading } = useFund(resolvedParams.id); // resolvedParams.id is now the fund address
   const isLoadingBalance = !fund || loading; // simple loading flag for balance section
 
   // Get real contract data using the fund address
   const { fundTokenBalance, currentFundValue, totalSupply, buyFundTokens, sellFundTokens, isBuyingTokens, refresh } =
-    useFundContract(params.id);
+    useFundContract(resolvedParams.id);
 
   // Copy functionality
   const { copyToClipboard, isCopiedToClipboard } = useCopyToClipboard();
@@ -66,8 +67,8 @@ const FundDetail = (props: any) => {
       fund.fund_tokens?.map(token => ({
         token: token.token_address,
         allocation: token.weight_percentage,
-        price: Math.random() * 200, // Mock price - would get from oracle
-        value: Math.random() * 500000, // Mock value - would calculate from real data
+        price: "Coming Soon" as string | number, // Price data integration pending
+        value: "Coming Soon" as string | number, // Value calculation integration pending
       })) || [],
     ticker: fund.ticker,
     fundAddress: fund.fund_address,
@@ -237,8 +238,16 @@ const FundDetail = (props: any) => {
                           <tr key={index} className="border-b last:border-b-0">
                             <td className="py-4 font-medium">{holding.token}</td>
                             <td className="py-4">{holding.allocation}%</td>
-                            <td className="py-4">${holding.price.toFixed(2)}</td>
-                            <td className="py-4">${holding.value.toLocaleString()}</td>
+                            <td className="py-4">
+                              {typeof holding.price === "string"
+                                ? holding.price
+                                : `$${(holding.price as number).toFixed(2)}`}
+                            </td>
+                            <td className="py-4">
+                              {typeof holding.value === "string"
+                                ? holding.value
+                                : `$${(holding.value as number).toLocaleString()}`}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -321,11 +330,11 @@ const FundDetail = (props: any) => {
                   <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                     <div className="flex justify-between text-sm mb-1">
                       <span>Estimated Fees</span>
-                      <span>${estimatedFees.toFixed(2)}</span>
+                      <span>{estimatedFees.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between font-semibold">
                       <span>Total</span>
-                      <span>${total.toFixed(2)}</span>
+                      <span>{total.toFixed(2)}</span>
                     </div>
                   </div>
                 )}

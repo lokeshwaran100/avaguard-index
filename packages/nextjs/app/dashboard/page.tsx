@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import { getAvalancheFujiTokenAddresses, useFundContract } from "~~/hooks/useContracts";
+import { getAvalancheMainnetTokenAddresses, useAGIToken, useFundContract } from "~~/hooks/useContracts";
 import { updateFundWeights, useUserFunds, useUserInvestments } from "~~/hooks/useSupabase";
 import { Fund, FundToken } from "~~/lib/supabase";
 
@@ -20,7 +20,7 @@ const CreatedFundCard = ({
   const [newWeights, setNewWeights] = useState<{ [tokenAddress: string]: number }>({});
   const [isUpdating, setIsUpdating] = useState(false);
   const { rebalanceFund } = useFundContract(fund.fund_address);
-  const fujiTokens = getAvalancheFujiTokenAddresses();
+  const mainnetTokens = getAvalancheMainnetTokenAddresses();
 
   // Initialize weights from fund tokens
   const initializeWeights = () => {
@@ -63,7 +63,7 @@ const CreatedFundCard = ({
       const tokensOrdered = (fund.fund_tokens || []).map(t => t.token_address);
       const tokenAddrs: string[] = tokensOrdered.map(id => {
         if (id?.startsWith("0x") && id.length === 42) return id;
-        const mapped = fujiTokens[(id as keyof typeof fujiTokens) || ("" as any)];
+        const mapped = mainnetTokens[(id as keyof typeof mainnetTokens) || ("" as any)];
         return mapped || id;
       });
       const weightsPercent = tokensOrdered.map(id => newWeights[id] ?? 0);
@@ -122,27 +122,36 @@ const CreatedFundCard = ({
       {/* Token allocation display/edit */}
       <div className="space-y-2">
         <h4 className="text-sm font-medium text-gray-700">Token Allocation:</h4>
-        {fund.fund_tokens?.map(token => (
-          <div key={token.token_address} className="flex justify-between items-center">
-            <span className="text-sm">{token.token_address}</span>
-            {isRebalancing ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={newWeights[token.token_address] || 0}
-                  onChange={e => handleWeightChange(token.token_address, e.target.value)}
-                  className="w-16 px-2 py-1 text-xs border rounded"
-                />
-                <span className="text-xs">%</span>
-              </div>
-            ) : (
-              <span className="text-sm font-medium">{token.weight_percentage}%</span>
-            )}
-          </div>
-        ))}
+        {fund.fund_tokens?.map(token => {
+          // Convert token address to readable name
+          const getTokenName = (address: string) => {
+            if (address === "0x152b9d0FdC40C096757F570A51E494bd4b943E50") return "WBTC";
+            if (address === "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB") return "WETH";
+            return address.slice(0, 8) + "...";
+          };
+
+          return (
+            <div key={token.token_address} className="flex justify-between items-center">
+              <span className="text-sm font-medium">{getTokenName(token.token_address)}</span>
+              {isRebalancing ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={newWeights[token.token_address] || 0}
+                    onChange={e => handleWeightChange(token.token_address, e.target.value)}
+                    className="w-16 px-2 py-1 text-xs border rounded"
+                  />
+                  <span className="text-xs">%</span>
+                </div>
+              ) : (
+                <span className="text-sm font-medium">{token.weight_percentage}%</span>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Rebalance controls */}
@@ -180,16 +189,17 @@ const Dashboard: NextPage = () => {
   const { isConnected, address } = useAccount();
   const [timeframe, setTimeframe] = useState("1W");
 
-  // Get real data from Supabase
+  // Get real data from Supabase and contracts
   const { funds: createdFunds, refetch: refetchUserFunds } = useUserFunds(address);
   const { investments } = useUserInvestments(address);
+  const { agiBalance } = useAGIToken();
 
   // Calculate portfolio data from real investments
   const portfolioData = {
-    totalValue: investments.reduce((sum, inv) => sum + (inv.share_balance || 0) * 12.34, 0), // Mock price
-    agiBalance: 1234.56, // This would come from wallet/contract
-    totalPL: investments.reduce((sum, inv) => sum + (inv.share_balance || 0) * 0.5, 0), // Mock P/L
-    plPercentage: 2.5, // Mock percentage
+    totalValue: investments.reduce((sum, inv) => sum + (inv.share_balance || 0), 0), // Sum of share balances
+    agiBalance: agiBalance || 0, // Real AGI balance from contract
+    totalPL: 0, // Will be calculated when we have price data
+    plPercentage: 0, // Will be calculated when we have price data
   };
 
   // Transform data for display
@@ -198,9 +208,9 @@ const Dashboard: NextPage = () => {
       id: fund.fund_address,
       name: fund.name,
       type: "Created" as const,
-      value: Math.random() * 20000, // Mock value - would calculate from TVL
-      change24h: Math.random() * 4 - 2, // Mock 24h change
-      totalPL: Math.random() * 2000, // Mock P/L
+      value: 0, // Will be calculated from fund TVL
+      change24h: 0, // Will be calculated when we have price data
+      totalPL: 0, // Will be calculated when we have price data
       status: "active" as const,
       ticker: fund.ticker,
     })),
@@ -208,9 +218,9 @@ const Dashboard: NextPage = () => {
       id: inv.fund?.fund_address || "",
       name: inv.fund?.name || "Unknown Fund",
       type: "Invested" as const,
-      value: (inv.share_balance || 0) * 12.34, // Mock price per share
-      change24h: Math.random() * 4 - 2, // Mock 24h change
-      totalPL: (inv.share_balance || 0) * 0.5, // Mock P/L
+      value: inv.share_balance || 0, // Share balance
+      change24h: 0, // Will be calculated when we have price data
+      totalPL: 0, // Will be calculated when we have price data
       status: "active" as const,
       ticker: inv.fund?.ticker || "",
     })),
@@ -242,7 +252,7 @@ const Dashboard: NextPage = () => {
         <div className="bg-white p-6 rounded-xl shadow-sm border">
           <h3 className="text-sm font-medium text-gray-600 mb-2">AGI Balance</h3>
           <p className="text-2xl font-bold">{portfolioData.agiBalance.toLocaleString()}</p>
-          <p className="text-sm text-gray-500">≈ ${(portfolioData.agiBalance * 10.345).toFixed(2)} USD</p>
+          {/* <p className="text-sm text-gray-500">≈ ${(portfolioData.agiBalance * 10.345).toFixed(2)} USD</p> */}
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border">
