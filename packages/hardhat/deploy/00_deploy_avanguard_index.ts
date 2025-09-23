@@ -52,13 +52,17 @@ const deployAvanguardIndex: DeployFunction = async function (hre: HardhatRuntime
   const WAVAX_MAINNET = "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7"; // Mainnet WAVAX
 
   // Token addresses for mainnet
-  const WBTC_MAINNET = "0x152b9d0FdC40C096757F570A51E494bd4b943E50";
-  const WETH_MAINNET = "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB";
+  const BTC_B_MAINNET = "0x152b9d0FdC40C096757F570A51E494bd4b943E50"; // BTC.b
+  const WETH_E_MAINNET = "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB"; // WETH.e
+  const USDC_MAINNET = "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"; // USDC
+  const USDT_E_MAINNET = "0xc7198437980c041c805A1EDcbA50c1Ce5db95118"; // USDT.e
 
   // Chainlink Price Feed addresses on Avalanche
   const AVAX_USD_FEED = "0x0A77230d17318075983913bC2145DB16C7366156"; // Mainnet
   const BTC_USD_FEED = "0x2779D32d5166BAaa2B2b658333bA7e6Ec0C65743"; // Mainnet
   const ETH_USD_FEED = "0x976B3D034E162d8bD72D6b9C989d545b839003b0"; // Mainnet
+  const USDC_USD_FEED = "0xF096872672F44d6EBA71458D74fe67F9a77a23B9"; // Mainnet
+  const USDT_USD_FEED = "0xEBE676ee90Fe1112671f19b6B7459bC678B67e8a"; // Mainnet
 
   // Use appropriate addresses based on network
   const DEX_ROUTER = isAvalanche ? TRADER_JOE_ROUTER : PANGOLIN_ROUTER;
@@ -99,9 +103,12 @@ const deployAvanguardIndex: DeployFunction = async function (hre: HardhatRuntime
   if (isAvalanche) {
     // Configure price feeds for Avalanche mainnet
     await oracleContract.setPriceFeed(ethers.ZeroAddress, AVAX_USD_FEED); // AVAX/USD
-    await oracleContract.setPriceFeed(WBTC_MAINNET, BTC_USD_FEED); // WBTC/USD
-    await oracleContract.setPriceFeed(WETH_MAINNET, ETH_USD_FEED); // WETH/USD
-    console.log("  - Configured price feeds for AVAX, WBTC, and WETH on Avalanche mainnet");
+    await oracleContract.setPriceFeed(WAVAX_MAINNET, AVAX_USD_FEED); // WAVAX/USD (same as AVAX)
+    await oracleContract.setPriceFeed(BTC_B_MAINNET, BTC_USD_FEED); // BTC.b/USD
+    await oracleContract.setPriceFeed(WETH_E_MAINNET, ETH_USD_FEED); // WETH.e/USD
+    await oracleContract.setPriceFeed(USDC_MAINNET, USDC_USD_FEED); // USDC/USD
+    await oracleContract.setPriceFeed(USDT_E_MAINNET, USDT_USD_FEED); // USDT.e/USD
+    console.log("  - Configured price feeds for AVAX, WAVAX, BTC.b, WETH.e, USDC, and USDT.e on Avalanche mainnet");
   } else {
     // For Fuji testnet, we could deploy mock price feeds or use existing ones
     console.log("  - ChainlinkOracle deployed on Fuji testnet (price feeds need manual configuration)");

@@ -125,8 +125,10 @@ const CreatedFundCard = ({
         {fund.fund_tokens?.map(token => {
           // Convert token address to readable name
           const getTokenName = (address: string) => {
-            if (address === "0x152b9d0FdC40C096757F570A51E494bd4b943E50") return "WBTC";
-            if (address === "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB") return "WETH";
+            if (address === "0x152b9d0FdC40C096757F570A51E494bd4b943E50") return "BTC.b";
+            if (address === "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB") return "WETH.e";
+            if (address === "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E") return "USDC";
+            if (address === "0xc7198437980c041c805A1EDcbA50c1Ce5db95118") return "USDT.e";
             return address.slice(0, 8) + "...";
           };
 

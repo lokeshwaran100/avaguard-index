@@ -26,8 +26,10 @@ const Invest: NextPage = () => {
     assets:
       fund.fund_tokens?.map(token => {
         // Convert token addresses to readable names
-        if (token.token_address === "0x152b9d0FdC40C096757F570A51E494bd4b943E50") return "WBTC";
-        if (token.token_address === "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB") return "WETH";
+        if (token.token_address === "0x152b9d0FdC40C096757F570A51E494bd4b943E50") return "BTC.b";
+        if (token.token_address === "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB") return "WETH.e";
+        if (token.token_address === "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E") return "USDC";
+        if (token.token_address === "0xc7198437980c041c805A1EDcbA50c1Ce5db95118") return "USDT.e";
         return token.token_address.slice(0, 6);
       }) || [],
     apy: 0, // Will be calculated when we have performance data
